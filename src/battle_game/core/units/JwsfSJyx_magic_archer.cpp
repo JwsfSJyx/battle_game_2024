@@ -38,7 +38,7 @@ MagicArcher::MagicArcher(GameCore *game_core, uint32_t id, uint32_t player_id)
         body_indices.push_back(precision);
       }
       body_vertices.push_back(
-          {{0.0f, 0.0f}, {0.0f, 0.0f}, {0.0f, 0.0f, 1.0f, 1.0f}});
+          {{0.0f, 0.0f}, {0.0f, 0.0f}, {1.0f, 1.0f, 1.0f, 1.0f}});
       body_vertices.push_back(
           {{0.5f, -0.6f}, {0.0f, 0.0f}, {1.0f, 1.0f, 1.0f, 1.0f}});
       body_vertices.push_back(
@@ -97,6 +97,8 @@ void MagicArcher::Update() {
   MagicArcherMove(3.0f, glm::radians(180.0f));
   BowAndArrowRotate();
   Fire();
+  SkillC();
+  ImmediateMove();
 }
 
 void MagicArcher::MagicArcherMove(float move_speed,
@@ -157,19 +159,80 @@ void MagicArcher::Fire() {
             position_ + Rotate({0.0f, 1.2f}, bow_and_arrow_rotation_),
             bow_and_arrow_rotation_, GetDamageScale(), velocity);
         GenerateBullet<bullet::CannonBall>(
-            position_ + Rotate({0.0f, 1.2f},
-                               bow_and_arrow_rotation_ ),
-            bow_and_arrow_rotation_, GetDamageScale(), Rotate(velocity,glm::radians(20.0f)));
+            position_ + Rotate({0.0f, 1.2f}, bow_and_arrow_rotation_),
+            bow_and_arrow_rotation_, GetDamageScale(),
+            Rotate(velocity, glm::radians(20.0f)));
         GenerateBullet<bullet::CannonBall>(
-            position_ + Rotate({0.0f, 1.2f},
-                               bow_and_arrow_rotation_ ),
-            bow_and_arrow_rotation_, GetDamageScale(), Rotate(velocity,glm::radians(-20.0f)));
+            position_ + Rotate({0.0f, 1.2f}, bow_and_arrow_rotation_),
+            bow_and_arrow_rotation_, GetDamageScale(),
+            Rotate(velocity, glm::radians(-20.0f)));
         fire_count_down_ = kTickPerSecond;  // Fire interval 1 second.
       }
     }
   }
   if (fire_count_down_) {
     fire_count_down_--;
+  }
+}
+
+void MagicArcher::SkillC() {
+  auto player = game_core_->GetPlayer(player_id_);
+  if (player) {
+    auto &input_data = player->GetInputData();
+    if (!is_c_available_) {
+      auto now = std::chrono::high_resolution_clock::now();
+      std::chrono::duration<double, std::milli> duration =
+          now - skill_c_cd_time_;
+      if (duration.count() > 10000)
+        is_c_available_ = true;
+      else
+        is_c_available_ = false;
+    }
+    if (is_c_available_ && input_data.key_down[GLFW_KEY_C]) {
+      skill_c_cd_time_ = std::chrono::high_resolution_clock::now();
+      is_c_available_ = false;
+      const int precision = 24;
+      const float inv_precision = 1.0f / precision;
+      auto velocity = Rotate(glm::vec2{0.0f, 5.0f}, bow_and_arrow_rotation_);
+      for (int i = 0; i < precision; ++i) {
+        GenerateBullet<bullet::CannonBall>(
+            position_ + Rotate({0.0f, 1.2f}, bow_and_arrow_rotation_),
+            bow_and_arrow_rotation_, GetDamageScale() * 0.3f,
+            Rotate(velocity,
+                   glm::radians(static_cast<float>(i * 360 * inv_precision))));
+      }
+    }
+  }
+}
+
+void MagicArcher::ImmediateMove() {
+  auto player = game_core_->GetPlayer(player_id_);
+  if (player) {
+    auto &input_data = player->GetInputData();
+    if (!is_im_move_available_) {
+      auto now = std::chrono::high_resolution_clock::now();
+      std::chrono::duration<double, std::milli> duration =
+          now - im_move_cd_time_;
+      if (duration.count() > 5000)
+        is_im_move_available_ = true;
+      else
+        is_im_move_available_ = false;
+    }
+    if (is_im_move_available_ && input_data.key_down[GLFW_KEY_V]) {
+      im_move_cd_time_ = std::chrono::high_resolution_clock::now();
+      is_im_move_available_ = false;
+      const int steps = 180;
+      glm::vec2 new_position = GetPosition();
+      for (int i = 0; i < steps; ++i) {
+        new_position.x +=
+            kSecondPerTick * std::cos(GetRotation() + glm::pi<float>() * 0.5);
+        new_position.y +=
+            kSecondPerTick * std::sin(GetRotation() + glm::pi<float>() * 0.5);
+        if (!game_core_->IsBlockedByObstacles(new_position)) {
+          game_core_->PushEventMoveUnit(id_, new_position);
+        }
+      }
+    }
   }
 }
 
@@ -184,7 +247,7 @@ bool MagicArcher::IsHit(glm::vec2 position) const {
 const char *MagicArcher::UnitName() const {
   return "Magic Archer";
 }
-
+auto start = std::chrono::high_resolution_clock::now();
 const char *MagicArcher::Author() const {
   return "JwsfSJyx";
 }
