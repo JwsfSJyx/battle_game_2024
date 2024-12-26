@@ -1,6 +1,10 @@
 #pragma once
 #include "battle_game/core/unit.h"
 
+// features:
+// 1. 3 split bullet.
+// 2. lower health, higher damage.
+
 namespace battle_game::unit {
 class MagicArcher : public Unit {
  public:
@@ -17,7 +21,7 @@ class MagicArcher : public Unit {
   [[nodiscard]] const char *Author() const override;
   float GetDamageScale() const override {
     return static_cast<float>(3 - 2 * GetHealth());
-  }// lower HP higher ATK
+  }
   float bow_and_arrow_rotation_{0.0f};
   uint32_t fire_count_down_{0};
   uint32_t mine_count_down_{0};
