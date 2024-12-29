@@ -99,6 +99,7 @@ void MagicArcher::Update() {
   Fire();
   SkillC();
   ImmediateMove();
+  ReduceHealth();
 }
 
 void MagicArcher::MagicArcherMove(float move_speed,
@@ -155,16 +156,16 @@ void MagicArcher::Fire() {
       auto &input_data = player->GetInputData();
       if (input_data.mouse_button_down[GLFW_MOUSE_BUTTON_LEFT]) {
         auto velocity = Rotate(glm::vec2{0.0f, 5.0f}, bow_and_arrow_rotation_);
-        GenerateBullet<bullet::CannonBall>(
+        GenerateBullet<bullet::Arrow>(
             position_ + Rotate({0.0f, 1.2f}, bow_and_arrow_rotation_),
-            bow_and_arrow_rotation_, GetDamageScale(), velocity);
-        GenerateBullet<bullet::CannonBall>(
+            bow_and_arrow_rotation_, GetDamageScale(), heal_scale_, velocity);
+        GenerateBullet<bullet::Arrow>(
             position_ + Rotate({0.0f, 1.2f}, bow_and_arrow_rotation_),
-            bow_and_arrow_rotation_, GetDamageScale(),
+            bow_and_arrow_rotation_, GetDamageScale(), heal_scale_,
             Rotate(velocity, glm::radians(20.0f)));
-        GenerateBullet<bullet::CannonBall>(
+        GenerateBullet<bullet::Arrow>(
             position_ + Rotate({0.0f, 1.2f}, bow_and_arrow_rotation_),
-            bow_and_arrow_rotation_, GetDamageScale(),
+            bow_and_arrow_rotation_, GetDamageScale(), heal_scale_,
             Rotate(velocity, glm::radians(-20.0f)));
         fire_count_down_ = kTickPerSecond;  // Fire interval 1 second.
       }
@@ -195,9 +196,9 @@ void MagicArcher::SkillC() {
       const float inv_precision = 1.0f / precision;
       auto velocity = Rotate(glm::vec2{0.0f, 5.0f}, bow_and_arrow_rotation_);
       for (int i = 0; i < precision; ++i) {
-        GenerateBullet<bullet::CannonBall>(
+        GenerateBullet<bullet::Arrow>(
             position_ + Rotate({0.0f, 1.2f}, bow_and_arrow_rotation_),
-            bow_and_arrow_rotation_, GetDamageScale() * 0.3f,
+            bow_and_arrow_rotation_, GetDamageScale() * 0.3f, heal_scale_,
             Rotate(velocity,
                    glm::radians(static_cast<float>(i * 360 * inv_precision))));
       }
@@ -217,10 +218,13 @@ void MagicArcher::ImmediateMove() {
         is_im_move_available_ = true;
       else
         is_im_move_available_ = false;
+      if (duration.count() > 3000)
+        heal_scale_ = 0.0f;
     }
     if (is_im_move_available_ && input_data.key_down[GLFW_KEY_V]) {
       im_move_cd_time_ = std::chrono::high_resolution_clock::now();
       is_im_move_available_ = false;
+      heal_scale_ = 0.3f;
       const int steps = 180;
       glm::vec2 new_position = GetPosition();
       for (int i = 0; i < steps; ++i) {
@@ -232,6 +236,27 @@ void MagicArcher::ImmediateMove() {
           game_core_->PushEventMoveUnit(id_, new_position);
         }
       }
+    }
+  }
+}
+
+void MagicArcher::ReduceHealth() {
+  auto player = game_core_->GetPlayer(player_id_);
+  if (player) {
+    auto &input_data = player->GetInputData();
+    if (!is_reduce_health_available_) {
+      auto now = std::chrono::high_resolution_clock::now();
+      std::chrono::duration<double, std::milli> duration =
+          now - reduce_health_cd_time_;
+      if (duration.count() > 1000)
+        is_reduce_health_available_ = true;
+      else
+        is_reduce_health_available_ = false;
+    }
+    if (is_reduce_health_available_ && input_data.key_down[GLFW_KEY_O]) {
+      reduce_health_cd_time_ = std::chrono::high_resolution_clock::now();
+      is_reduce_health_available_ = false;
+      health_ *= 0.8f;
     }
   }
 }
